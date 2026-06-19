@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="./assets/logo.png" height="600">
+    <img src="./assets/logo.png" height="400">
     <h1>GPO Skeleton</h1>
 </div>
 
