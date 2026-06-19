@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Version segment to increment
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    env:
+      PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate version
+        id: version
+        shell: pwsh
+        run: |
+          $manifestPath = Join-Path $PWD 'gpo-skeleton/gpo-skeleton.psd1'
+          $manifest = Import-PowerShellDataFile -Path $manifestPath
+          $current = [version]$manifest.ModuleVersion
+
+          switch ('${{ inputs.version_bump }}') {
+            'major' { $next = [version]::new($current.Major + 1, 0, 0); break }
+            'minor' { $next = [version]::new($current.Major, $current.Minor + 1, 0); break }
+            'patch' { $next = [version]::new($current.Major, $current.Minor, $current.Build + 1); break }
+            default { throw "Unsupported version bump: ${{ inputs.version_bump }}" }
+          }
+
+          Update-ModuleManifest -Path $manifestPath -ModuleVersion $next -ReleaseNotes "Release $next"
+          "version=$next" >> $env:GITHUB_OUTPUT
+
+      - name: Validate module
+        shell: pwsh
+        run: |
+          $manifestPath = Join-Path $PWD 'gpo-skeleton/gpo-skeleton.psd1'
+          Test-ModuleManifest -Path $manifestPath -ErrorAction Stop | Out-Null
+          Import-Module $manifestPath -Force -ErrorAction Stop
+          Get-Command -Module gpo-skeleton | Format-Table -AutoSize
+
+      - name: Publish to PowerShell Gallery
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) {
+            throw 'GitHub secret PSGALLERY_API_KEY is not configured.'
+          }
+
+          Publish-Module -Path (Join-Path $PWD 'gpo-skeleton') -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery -Verbose
+
+      - name: Commit version and tag
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gpo-skeleton/gpo-skeleton.psd1
+          git commit -m "Release v$version"
+          git tag "v$version"
+          git push origin HEAD
+          git push origin "v$version"
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          gh release create "v$version" --title "v$version" --notes "PowerShell Gallery release v$version"

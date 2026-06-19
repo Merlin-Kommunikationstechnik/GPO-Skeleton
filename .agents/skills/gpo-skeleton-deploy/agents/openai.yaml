@@ -1,0 +1,3 @@
+display_name: GPO Skeleton Deploy
+short_description: Create deploy.ps1 wrappers for unchanged PowerShell scripts using gpo-skeleton.
+default_prompt: Create a deploy.ps1 for this target PowerShell script using the gpo-skeleton module.
