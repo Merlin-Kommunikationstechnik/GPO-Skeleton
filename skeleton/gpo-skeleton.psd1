@@ -1,6 +1,6 @@
 @{
     RootModule = 'gpo-skeleton.psm1'
-    ModuleVersion = '0.1.0'
+    ModuleVersion = '0.0.1'
     GUID = 'b6f8c603-6d7f-4c9d-9e0a-250db4c38676'
     Author = 'Uefi-sentinal'
     CompanyName = 'Unknown'
